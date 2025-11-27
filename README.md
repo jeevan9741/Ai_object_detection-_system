@@ -67,3 +67,27 @@ cd Ai_object_detection-_system
 
 ## Screenshot 3
 ![Screenshot 3](screenshots/screen3.png)
+
+#<------------------------->
+# ▶️ Run Command (Quick Start)
+
+If you want to run the project immediately, open a terminal inside the project folder and run:
+
+#  bash
+python -m http.server 8080
+
+# Then open your browser and go to:->
+http://localhost:8080
+
+
+#//<------------------------------------------------------------->//
+
+# 👍 If you prefer Node.js, also add:
+
+#  md
+### Or using Node.js:
+
+#  bash
+http-server
+
+
