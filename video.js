@@ -1,105 +1,118 @@
-document.getElementById("ai").addEventListener("change", toggleAi)
-document.getElementById("fps").addEventListener("input", changeFps)
+document.getElementById("ai").addEventListener("change", toggleAi);
+document.getElementById("fps").addEventListener("input", changeFps);
 
 const video = document.getElementById("video");
-const c1 = document.getElementById('c1');
-const ctx1 = c1.getContext('2d');
-var cameraAvailable = false;
-var aiEnabled = false;
-var fps = 16;
+const c1 = document.getElementById("c1");
+const ctx1 = c1.getContext("2d");
 
-/* Setting up the constraint */
-var facingMode = "environment"; // Can be 'user' or 'environment' to access back or front camera (NEAT!)
-var constraints = {
+let cameraAvailable = false;
+let aiEnabled = false;
+let fps = 50; // default slider value
+let detecting = false; // prevents overlapping AI calls
+
+/* Camera settings */
+let facingMode = "environment";
+let constraints = {
     audio: false,
-    video: {
-        facingMode: facingMode
-    }
+    video: { facingMode: facingMode }
 };
 
-/* Stream it to video element */
-camera();
+/* Start camera */
 function camera() {
     if (!cameraAvailable) {
-        console.log("camera")
-        navigator.mediaDevices.getUserMedia(constraints).then(function (stream) {
-            cameraAvailable = true;
-            video.srcObject = stream;
-        }).catch(function (err) {
-            cameraAvailable = false;
-            if (modelIsLoaded) {
-                if (err.name === "NotAllowedError") {
-                    document.getElementById("loadingText").innerText = "Waiting for camera permission";
+        navigator.mediaDevices
+            .getUserMedia(constraints)
+            .then(stream => {
+                cameraAvailable = true;
+                video.srcObject = stream;
+            })
+            .catch(err => {
+                cameraAvailable = false;
+                if (modelIsLoaded && err.name === "NotAllowedError") {
+                    document.getElementById("loadingText").innerText =
+                        "Waiting for camera permission...";
                 }
-            }
-            setTimeout(camera, 1000);
-        });
+                setTimeout(camera, 1000);
+            });
     }
 }
 
+camera();
+
+/* Main loop */
 window.onload = function () {
     timerCallback();
-}
+};
 
 function timerCallback() {
     if (isReady()) {
         setResolution();
         ctx1.drawImage(video, 0, 0, c1.width, c1.height);
-        if (aiEnabled) {
-            ai();
+
+        if (aiEnabled && !detecting) {
+            detecting = true;
+
+            ai().then(() => {
+                detecting = false;
+            });
         }
     }
-    setTimeout(timerCallback, fps);
+    setTimeout(timerCallback, 1000 / fps); // correct FPS handling
 }
 
+/* Check if model + camera are ready */
 function isReady() {
     if (modelIsLoaded && cameraAvailable) {
         document.getElementById("loadingText").style.display = "none";
         document.getElementById("ai").disabled = false;
         return true;
-    } else {
-        return false;
     }
+    return false;
 }
 
+/* Dynamically adjust canvas */
 function setResolution() {
-    if (window.screen.width < video.videoWidth) {
-        c1.width = window.screen.width * 0.9;
-        let factor = c1.width / video.videoWidth;
-        c1.height = video.videoHeight * factor;
-    } else if (window.screen.height < video.videoHeight) {
-        c1.height = window.screen.height * 0.50;
-        let factor = c1.height / video.videoHeight;
-        c1.width = video.videoWidth * factor;
-    }
-    else {
+    if (video.videoWidth && video.videoHeight) {
         c1.width = video.videoWidth;
         c1.height = video.videoHeight;
     }
-};
+}
 
+/* Toggle AI */
 function toggleAi() {
     aiEnabled = document.getElementById("ai").checked;
 }
 
+/* Change FPS */
 function changeFps() {
-    fps = 1000 / document.getElementById("fps").value;
+    fps = parseInt(document.getElementById("fps").value);
 }
 
-function ai() {
-    // Detect objects in the image element
-    objectDetector.detect(c1, (err, results) => {
-        console.log(results); // Will output bounding boxes of detected objects
-        for (let index = 0; index < results.length; index++) {
-            const element = results[index];
-            ctx1.font = "15px Arial";
-            ctx1.fillStyle = "red";
-            ctx1.fillText(element.label + " - " + (element.confidence * 100).toFixed(2) + "%", element.x + 10, element.y + 15);
-            ctx1.beginPath();
+/* AI function */
+async function ai() {
+    try {
+        const results = await objectDetector.detect(c1);
+
+        ctx1.lineWidth = 2;
+        ctx1.font = "15px Arial";
+
+        results.forEach(obj => {
             ctx1.strokeStyle = "red";
-            ctx1.rect(element.x, element.y, element.width, element.height);
+            ctx1.fillStyle = "red";
+
+            ctx1.beginPath();
+            ctx1.rect(obj.x, obj.y, obj.width, obj.height);
             ctx1.stroke();
-            console.log(element.label);
-        }
-    });
+
+            ctx1.fillText(
+                `${obj.label} - ${(obj.confidence * 100).toFixed(1)}%`,
+                obj.x + 5,
+                obj.y + 15
+            );
+
+            console.log(obj.label);
+        });
+    } catch (error) {
+        console.error("Detection error:", error);
+    }
 }
